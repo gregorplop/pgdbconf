@@ -1,114 +1,20 @@
-#tag Class
-Protected Class pgdbconfSession
-	#tag Method, Flags = &h0
-		Function Append2Array(recordObject as pgdbconfRecord) As pgdbconfRecord
-		  // only inserts records with the (application/user/section/key) combination
-		  // when used repeatedy for the same combination, it effectively creates an array which can be read using ReadArray
-		  // returns the newly created record's objidx in the return Object
-		  
-		  if validateCachedParams = false then
-		    Return new localconfRecord("Localconf session no longer valid, please restart!")
-		  ElseIf IsNull(recordObject) then
-		    Return new localconfRecord("Invalid search parameters")
-		  end if
-		  
-		  dim db as new SQLiteDatabase
-		  db.DatabaseFile = file
-		  db.EncryptionKey = preparePassword(DecodeBase64(passwd))
-		  
-		  if db.Connect = false then 
-		    Return new localconfRecord("Error accessing settings file: " + db.ErrorMessage)
-		  end if
-		  
-		  if recordObject.key.Trim = "" then Return new localconfRecord("Key should not be empty!")
-		  
-		  dim newRecord as new DatabaseRecord
-		  
-		  newRecord.Column("language") = if(recordObject.language.Trim = "" , DefaultLanguage , recordObject.language.Trim.Uppercase)
-		  newRecord.Column("application") = if(recordObject.application.Trim = "" , GlobalName , recordObject.application.Trim.Uppercase)
-		  newRecord.Column("user") = if(recordObject.user.Trim = "" , GlobalName , recordObject.user.Trim.Uppercase)
-		  newRecord.Column("section") = if(recordObject.section.Trim = "" , GlobalName , recordObject.section.Trim.Uppercase)
-		  newRecord.Column("key") = recordObject.key.Trim.Uppercase
-		  
-		  if recordObject.value <> "" then newRecord.Column("value") = recordObject.value
-		  if recordObject.comment.Trim <> "" then newRecord.Column("comment") = recordObject.comment
-		  
-		  db.InsertRecord("localconf" , newRecord)
-		  if db.Error then Return new localconfRecord("Error writing settings file: " + db.ErrorMessage)
-		  
-		  recordObject.objidx = db.LastRowID
-		  
-		  db.Close
-		  
-		  Return recordObject
-		End Function
-	#tag EndMethod
-
-	#tag Method, Flags = &h0
-		Sub Constructor(initfile as FolderItem, password as string)
-		  // all localconf settings files are password-protected
-		  // the actual password is calculated using the user-supplied password: only localconfSession is meant to access the config file
-		  
-		  // returns empty string if OK, error message if error
-		  // although it's called a session, you'll notice that it only connects to the db file when needed. it does not keep the actual session to the database constantly open
-		  
-		  mLastError = ""
-		  
-		  if IsNull(initfile) then 
-		    mLastError = "Configuration file is null!"
-		  ElseIf initfile.Exists = false then
-		    mLastError = "Configuration file does not exist!"
-		  ElseIf password.Trim = "" Then
-		    mLastError = "No password for configuration file!"
-		  end if
-		  if mLastError <> "" then Return  // error in init parameters
-		  
-		  dim db as new SQLiteDatabase
-		  
-		  db.DatabaseFile = initfile
-		  db.EncryptionKey = preparePassword(password)
-		  
-		  dim outcome as Boolean = db.Connect
-		  
-		  if outcome = false then
-		    mLastError = "Could not open settings file: Corrupt or wrong password"
-		    Return  // fail
-		  end if
-		  
-		  // connected ok
-		  
-		  file = initfile  // keep it there for reopeing the db -- localconfSession does not keep an open connection to the database file
-		  passwd = EncodeBase64(password , 0)  // don't keep the plaintext password in memory
-		  db.Close
-		  
-		  Return
-		  
-		End Sub
-	#tag EndMethod
-
+#tag Module
+Protected Module pgdbconf
 	#tag Method, Flags = &h21
-		Private Function Count(recordObject as pgdbconfRecord) As integer
+		Private Function Count(extends db as PostgreSQLDatabase, recordObject as pgdbconfRecord) As integer
 		  // counts records that match the (language/application/user/section/key) criterion
 		  
 		  mLastError = ""
 		  
-		  if validateCachedParams = false then
-		    mLastError = "Localconf session no longer valid, please restart!"
-		  ElseIf IsNull(recordObject) then
+		  If IsNull(recordObject) then
 		    mLastError = "Invalid search parameters"
 		  ElseIf recordObject.key.Trim = "" then
 		    mLastError = "No key entered!"
+		  ElseIf validateSession(db) = false then
+		    mLastError = "Database session is not valid"
 		  end if
 		  if mLastError <> "" then return -1
 		  
-		  dim db as new SQLiteDatabase
-		  db.DatabaseFile = file
-		  db.EncryptionKey = preparePassword(DecodeBase64(passwd))
-		  
-		  if db.Connect = false then 
-		    mLastError = "Error accessing settings file: " + db.ErrorMessage
-		    Return -1
-		  end if
 		  
 		  dim WHERE as string
 		  WHERE = "language = " + if(recordObject.language.Trim = "" , "'" + DefaultLanguage + "'" , "'" + recordObject.language.Trim.Uppercase + "'") + " AND "
@@ -129,42 +35,54 @@ Protected Class pgdbconfSession
 	#tag EndMethod
 
 	#tag Method, Flags = &h0
-		Shared Function create(db as PostgreSQLDatabase, tablename as string) As string
-		  // returns empty string if OK, error message if error
+		Function pgdbconf_Append2Array(extends db as PostgreSQLDatabase, recordObject as pgdbconfRecord) As pgdbconfRecord
+		  // only inserts records with the (application/user/section/key) combination
+		  // when used repeatedy for the same combination, it effectively creates an array which can be read using ReadArray
 		  
-		  
-		  dim db as new SQLiteDatabase
-		  
-		  db.DatabaseFile = file
-		  db.EncryptionKey = preparePassword(password)
-		  
-		  dim outcome as Boolean 
-		  dim errorMsg as string
-		  
-		  outcome = db.CreateDatabaseFile
-		  if outcome = false then Return "Error creating new configuration file: " + db.ErrorMessage
-		  
-		  outcome = db.Connect
-		  if outcome = false then
-		    errorMsg = db.ErrorMessage
-		    db.DatabaseFile.Delete
-		    Return "Error opening newly created configuration file: " + errorMsg
+		  if validateSession(db) = false then
+		    Return new pgdbconfRecord("Database session is not valid")
+		  ElseIf IsNull(recordObject) then
+		    Return new pgdbconfRecord("Invalid search parameters")
 		  end if
 		  
-		  dim CREATETABLE as string = "CREATE TABLE localconf (objidx INTEGER PRIMARY KEY AUTOINCREMENT , language VARCHAR NOT NULL DEFAULT '" + DefaultLanguage + "' , application VARCHAR NOT NULL DEFAULT '" + GlobalName + "' , user VARCHAR NOT NULL DEFAULT '" + GlobalName + "' , section VARCHAR NOT NULL DEFAULT '" + GlobalName + "' , key VARCHAR NOT NULL , value VARCHAR , comment VARCHAR)"
+		  
+		  if recordObject.key.Trim = "" then Return new pgdbconfRecord("Key should not be empty!")
+		  
+		  dim newRecord as new DatabaseRecord
+		  
+		  newRecord.Column("language") = if(recordObject.language.Trim = "" , DefaultLanguage , recordObject.language.Trim.Uppercase)
+		  newRecord.Column("application") = if(recordObject.application.Trim = "" , GlobalName , recordObject.application.Trim.Uppercase)
+		  newRecord.Column("user") = if(recordObject.user.Trim = "" , GlobalName , recordObject.user.Trim.Uppercase)
+		  newRecord.Column("section") = if(recordObject.section.Trim = "" , GlobalName , recordObject.section.Trim.Uppercase)
+		  newRecord.Column("key") = recordObject.key.Trim.Uppercase
+		  
+		  if recordObject.value <> "" then newRecord.Column("value") = recordObject.value
+		  if recordObject.comment.Trim <> "" then newRecord.Column("comment") = recordObject.comment
+		  
+		  db.InsertRecord("localconf" , newRecord)
+		  if db.Error then Return new pgdbconfRecord("Error writing settings file: " + db.ErrorMessage)
+		  
+		  Return recordObject
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h0
+		Function pgdbconf_createTable(extends db as PostgreSQLDatabase, tablename as string) As string
+		  // returns empty string if OK, error message if error
+		  
+		  if validateSession(db) = false then return "The database session is not valid"
+		  if tablename.Trim = "" then return "No table name defined"
+		  
+		  dim CREATETABLE as string = "CREATE TABLE localconf (objidx uuid DEFAULT uuid_in(md5(random()::text || clock_timestamp()::text)::cstring) , language TEXT NOT NULL DEFAULT '" + DefaultLanguage + "' , application TEXT NOT NULL DEFAULT '" + GlobalName + "' , user TEXT NOT NULL DEFAULT '" + GlobalName + "' , section TEXT NOT NULL DEFAULT '" + GlobalName + "' , key TEXT NOT NULL , value TEXT , comment TEXT)"
 		  db.SQLExecute(CREATETABLE)
+		  
+		  if db.Error then return "Error creating pgdbconf table: " + db.ErrorMessage
 		  
 		  dim INSERTINITRECORD as String = "INSERT INTO localconf (section , key , value , comment) VALUES ('LOCALCONF' , 'INITSTAMP' , '" + date(new date).SQLDateTime + "' , 'Automatically generated by localconf')"
 		  db.SQLExecute(INSERTINITRECORD)
 		  
-		  if db.Error then
-		    errorMsg = db.ErrorMessage
-		    db.Close
-		    db.DatabaseFile.Delete
-		    Return "Error initializing newly created configuration file: " + errorMsg
-		  end if
+		  if db.Error then return "Error writing system record: " + db.ErrorMessage
 		  
-		  db.Close
 		  Return ""  // success
 		  
 		  
@@ -172,7 +90,7 @@ Protected Class pgdbconfSession
 	#tag EndMethod
 
 	#tag Method, Flags = &h0
-		Function Delete(recordObject as pgdbconfRecord) As pgdbconfRecord
+		Function pgdbconf_Delete(extends db as PostgreSQLDatabase, recordObject as pgdbconfRecord) As pgdbconfRecord
 		  // match criterion is either the (language/application/user/section/key) combination or objidx
 		  // priority on objidx
 		  
@@ -229,21 +147,21 @@ Protected Class pgdbconfSession
 	#tag EndMethod
 
 	#tag Method, Flags = &h0
-		Function LastError() As string
+		Function pgdbconf_LastError() As string
 		  Return mLastError
 		  
 		End Function
 	#tag EndMethod
 
 	#tag Method, Flags = &h0
-		Shared Function projectURL() As String
+		Function pgdbconf_projectURL() As String
 		  Return "https://github.com/gregorplop/pgdbconf"
 		  
 		End Function
 	#tag EndMethod
 
 	#tag Method, Flags = &h0
-		Function QueryDistinct(DistinctField as string, optional WHERE as string) As string()
+		Function pgdbconf_QueryDistinct(extends db as PostgreSQLDatabase, DistinctField as string, optional WHERE as string) As string()
 		  // if error then output is a -1 bounded array and LastError holds error message
 		  
 		  mLastError = ""
@@ -288,7 +206,7 @@ Protected Class pgdbconfSession
 	#tag EndMethod
 
 	#tag Method, Flags = &h0
-		Function QueryGeneric(optional WHERE as String = "TRUE") As pgdbconfRecord()
+		Function pgdbconf_QueryGeneric(extends db as PostgreSQLDatabase, optional WHERE as String = "TRUE") As pgdbconfRecord()
 		  // if error then output is 1-element array with .error = true and .errorMessage holds reason for error
 		  // if localconf file is empty then output is an array having UBound = -1
 		  
@@ -342,7 +260,7 @@ Protected Class pgdbconfSession
 	#tag EndMethod
 
 	#tag Method, Flags = &h0
-		Function ReadArray(recordObject as pgdbconfRecord) As pgdbconfRecord()
+		Function pgdbconf_ReadArray(extends db as PostgreSQLDatabase, recordObject as pgdbconfRecord) As pgdbconfRecord()
 		  // reads all elements that matche the (language/application/user/section/key) criterion
 		  // objidx is ignored if exists
 		  
@@ -406,7 +324,7 @@ Protected Class pgdbconfSession
 	#tag EndMethod
 
 	#tag Method, Flags = &h0
-		Function ReadSingle(recordObject as pgdbconfRecord) As pgdbconfRecord
+		Function pgdbconf_ReadSingle(extends db as PostgreSQLDatabase, recordObject as pgdbconfRecord) As pgdbconfRecord
 		  // reads the first element that matches the (application/user/section/key) OR (objidx) criterion
 		  // priority on objidx 
 		  
@@ -480,7 +398,7 @@ Protected Class pgdbconfSession
 	#tag EndMethod
 
 	#tag Method, Flags = &h0
-		Function Upsert(recordObject as pgdbconfRecord) As pgdbconfRecord
+		Function pgdbconf_Upsert(extends db as PostgreSQLDatabase, recordObject as pgdbconfRecord) As pgdbconfRecord
 		  // match criterion is either the (language/application/user/section/key) combination or objidx (only update)
 		  // objidx holds priority
 		  
@@ -590,10 +508,10 @@ Protected Class pgdbconfSession
 	#tag EndProperty
 
 
-	#tag Constant, Name = DefaultLanguage, Type = String, Dynamic = False, Default = \"DEFAULT", Scope = Public
+	#tag Constant, Name = DefaultLanguage, Type = String, Dynamic = False, Default = \"DEFAULT", Scope = Private
 	#tag EndConstant
 
-	#tag Constant, Name = GlobalName, Type = String, Dynamic = False, Default = \"GLOBAL", Scope = Public
+	#tag Constant, Name = GlobalName, Type = String, Dynamic = False, Default = \"GLOBAL", Scope = Private
 	#tag EndConstant
 
 
@@ -632,5 +550,5 @@ Protected Class pgdbconfSession
 			Type="Integer"
 		#tag EndViewProperty
 	#tag EndViewBehavior
-End Class
-#tag EndClass
+End Module
+#tag EndModule

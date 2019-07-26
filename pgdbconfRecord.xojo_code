@@ -48,11 +48,15 @@ Protected Class pgdbconfRecord
 	#tag EndProperty
 
 	#tag Property, Flags = &h0
-		objidx As Integer
+		objidx As string
 	#tag EndProperty
 
 	#tag Property, Flags = &h0
 		section As String
+	#tag EndProperty
+
+	#tag Property, Flags = &h0
+		TableName As String
 	#tag EndProperty
 
 	#tag Property, Flags = &h0
@@ -151,6 +155,12 @@ Protected Class pgdbconfRecord
 		#tag EndViewProperty
 		#tag ViewProperty
 			Name="key"
+			Group="Behavior"
+			Type="String"
+			EditorType="MultiLineEditor"
+		#tag EndViewProperty
+		#tag ViewProperty
+			Name="language"
 			Group="Behavior"
 			Type="String"
 		#tag EndViewProperty
