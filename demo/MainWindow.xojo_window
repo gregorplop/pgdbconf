@@ -26,12 +26,12 @@ Begin Window MainWindow
    Title           =   "pgdbconf_demo"
    Visible         =   True
    Width           =   1152
-   Begin PushButton openBtn
+   Begin PushButton connectBtn
       AutoDeactivate  =   True
       Bold            =   False
       ButtonStyle     =   "0"
       Cancel          =   False
-      Caption         =   "Open"
+      Caption         =   "Connect"
       Default         =   False
       Enabled         =   True
       Height          =   35
@@ -718,7 +718,7 @@ Begin Window MainWindow
       Index           =   -2147483648
       InitialParent   =   ""
       Italic          =   False
-      Left            =   129
+      Left            =   291
       LockBottom      =   True
       LockedInPosition=   False
       LockLeft        =   True
@@ -750,7 +750,7 @@ Begin Window MainWindow
       Index           =   -2147483648
       InitialParent   =   ""
       Italic          =   False
-      Left            =   291
+      Left            =   453
       LockBottom      =   True
       LockedInPosition=   False
       LockLeft        =   True
@@ -1036,12 +1036,12 @@ Begin Window MainWindow
       HelpTag         =   "database"
       Index           =   -2147483648
       Italic          =   False
-      Left            =   263
+      Left            =   241
       LimitText       =   0
       LockBottom      =   False
       LockedInPosition=   False
       LockLeft        =   True
-      LockRight       =   True
+      LockRight       =   False
       LockTop         =   True
       Mask            =   ""
       Password        =   False
@@ -1060,7 +1060,82 @@ Begin Window MainWindow
       Underline       =   False
       UseFocusRing    =   True
       Visible         =   True
-      Width           =   187
+      Width           =   147
+   End
+   Begin TextField tablenameField
+      AcceptTabs      =   False
+      Alignment       =   2
+      AutoDeactivate  =   True
+      AutomaticallyCheckSpelling=   False
+      BackColor       =   &cFFFFFF00
+      Bold            =   False
+      Border          =   True
+      CueText         =   "database"
+      DataField       =   ""
+      DataSource      =   ""
+      Enabled         =   True
+      Format          =   ""
+      Height          =   35
+      HelpTag         =   "database"
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   400
+      LimitText       =   0
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      Mask            =   ""
+      Password        =   False
+      ReadOnly        =   False
+      Scope           =   0
+      TabIndex        =   40
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Text            =   ""
+      TextColor       =   &c00000000
+      TextFont        =   "System"
+      TextSize        =   16.0
+      TextUnit        =   0
+      Top             =   20
+      Transparent     =   False
+      Underline       =   False
+      UseFocusRing    =   True
+      Visible         =   True
+      Width           =   147
+   End
+   Begin PushButton clearBtn
+      AutoDeactivate  =   True
+      Bold            =   False
+      ButtonStyle     =   "0"
+      Cancel          =   False
+      Caption         =   "Clear"
+      Default         =   False
+      Enabled         =   True
+      Height          =   35
+      HelpTag         =   ""
+      Index           =   -2147483648
+      InitialParent   =   ""
+      Italic          =   False
+      Left            =   20
+      LockBottom      =   True
+      LockedInPosition=   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   False
+      Scope           =   0
+      TabIndex        =   41
+      TabPanelIndex   =   0
+      TabStop         =   True
+      TextFont        =   "System"
+      TextSize        =   14.0
+      TextUnit        =   0
+      Top             =   512
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width           =   97
    End
 End
 #tag EndWindow
@@ -1079,7 +1154,7 @@ End
 
 	#tag Method, Flags = &h0
 		Sub autofillCredentials()
-		  dim pgpass as FolderItem = SpecialFolder.UserHome.Child("pgservice.txt")
+		  dim pgpass as FolderItem = SpecialFolder.UserHome.Child("pgdbconf.txt")
 		  
 		  if pgpass.Exists then
 		    
@@ -1089,6 +1164,7 @@ End
 		    hostField.Text = inputStream.ReadLine
 		    portField.Text = inputStream.ReadLine
 		    databasenameField.Text = inputStream.ReadLine
+		    tablenameField.Text = inputStream.ReadLine
 		    usernameField.Text = inputStream.ReadLine
 		    passwordField.Text = inputStream.ReadLine
 		    
@@ -1112,7 +1188,7 @@ End
 		Sub query()
 		  dumpList.DeleteAllRows
 		  
-		  dim allRecords(-1) as localconfRecord = myLocalconf.QueryGeneric(WHEREfield.Text.Trim)
+		  dim allRecords(-1) as pgdbconfRecord = dbsession.pgdbconf_QueryGeneric(tablenameField.Text.Trim , WHEREfield.Text.Trim)
 		  
 		  if allRecords.Ubound < 0 then
 		    MsgBox "No configuration entries!"
@@ -1130,7 +1206,7 @@ End
 	#tag EndMethod
 
 	#tag Method, Flags = &h0
-		Sub showRecords(records() as localconfRecord)
+		Sub showRecords(records() as pgdbconfRecord)
 		  dumpList.DeleteAllRows
 		  
 		  dim row(7) as String
@@ -1159,11 +1235,10 @@ End
 		    
 		  case "OPEN"
 		    
-		    localconf_filenameField.Enabled = false
 		    passwordField.Enabled = False
-		    openBtn.Enabled = false
+		    connectBtn.Enabled = false
 		    closeBtn.Enabled = true
-		    CreateBtn.Enabled = False
+		    CreateBtn.Enabled = true
 		    
 		    WHEREfield.Enabled = true
 		    
@@ -1183,9 +1258,8 @@ End
 		    
 		  case "CLOSED"
 		    
-		    localconf_filenameField.Enabled = true
 		    passwordField.Enabled = true
-		    openBtn.Enabled = true
+		    connectBtn.Enabled = true
 		    closeBtn.Enabled = False
 		    CreateBtn.Enabled = true
 		    
@@ -1215,49 +1289,27 @@ End
 		dbsession As PostgreSQLDatabase
 	#tag EndProperty
 
-	#tag Property, Flags = &h0
-		myPgdbconf As pgdbconfSession
-	#tag EndProperty
-
 
 #tag EndWindowCode
 
-#tag Events openBtn
+#tag Events connectBtn
 	#tag Event
 		Sub Action()
 		  dbsession = new PostgreSQLDatabase
 		  
-		  db = new PostgreSQLDatabase
+		  dbsession.Host = hostField.Text.Trim
+		  dbsession.Port = portField.Text.Trim.Val
+		  dbsession.DatabaseName = databasenameField.Text.Trim
+		  dbsession.UserName = usernameField.Text.Trim
+		  dbsession.Password = passwordField.Text.Trim
 		  
-		  db.Host = hostField.Text.Trim
-		  db.Port = portField.Text.Trim.Val
-		  db.DatabaseName = databasenameField.Text.Trim
-		  db.UserName = usernameField.Text.Trim
-		  db.Password = passwordField.Text.Trim
-		  
-		  if db.Connect = false then 
-		    log.AddRow db.ErrorMessage
+		  if dbsession.Connect = false then 
+		    MainLabel.Text = dbsession.ErrorMessage
 		    return
 		  else
-		    log.AddRow "connected to db" 
-		  end if
-		  
-		  
-		  myPgdbconf = new localconfSession(GetFolderItem(localconf_filenameField.Text) , passwordField.Text)
-		  
-		  if myLocalconf.LastError = "" then
+		    MainLabel.Text = "connected to db" 
 		    UI_mode("OPEN")
-		    
-		    WHEREfield.Text = ""
-		    query
-		    
-		    
-		  else
-		    MsgBox myLocalconf.LastError
-		    myLocalconf = nil
 		  end if
-		  
-		  
 		  
 		  
 		  
@@ -1267,7 +1319,7 @@ End
 #tag Events closeBtn
 	#tag Event
 		Sub Action()
-		  myLocalconf = nil
+		  dbsession.Close
 		  
 		  UI_mode("CLOSED")
 		  
@@ -1298,8 +1350,10 @@ End
 		Sub DoubleClick()
 		  Dim row, column As Integer
 		  row = Me.RowFromXY(System.MouseX - Me.Left - Self.Left, System.MouseY - Me.Top - Self.Top)
+		  column = Me.ColumnFromXY(System.MouseX - Me.Left - Self.Left, System.MouseY - Me.Top - Self.Top)
 		  
 		  if row >= 0 then
+		    
 		    languageField.Text = me.cell(row,1)
 		    applicationField.Text = me.cell(row,2)
 		    userField.Text = me.cell(row,3)
@@ -1307,6 +1361,10 @@ End
 		    keyField.Text = me.cell(row,5)
 		    valueField.Text = me.cell(row,6)
 		    commentField.Text = me.cell(row,7)
+		    
+		    dim c as new Clipboard
+		    c.SetText(me.cell(row,column))
+		    c.Close
 		    
 		  end if
 		  
@@ -1330,7 +1388,7 @@ End
 #tag Events refreshBtn
 	#tag Event
 		Sub Action()
-		  if IsNull(myLocalconf) = false then query
+		  if IsNull(dbsession) = false then query
 		  
 		End Sub
 	#tag EndEvent
@@ -1338,10 +1396,10 @@ End
 #tag Events CreateBtn
 	#tag Event
 		Sub Action()
-		  dim createOutcome as String = localconfSession.create(GetFolderItem(localconf_filenameField.Text) , passwordField.Text)
+		  dim createOutcome as string = dbsession.pgdbconf_createTable(tablenameField.Text.Trim)
 		  
 		  if createOutcome = "" then
-		    MsgBox "localconf file created OK"
+		    MsgBox "table created OK"
 		  else
 		    MsgBox "Error: " + EndOfLine + createOutcome
 		  end if
@@ -1352,14 +1410,17 @@ End
 #tag Events UpsertBtn
 	#tag Event
 		Sub Action()
-		  dim confObj as new localconfRecord(true)
+		  dim confObj as new pgdbconfRecord(true)
+		  
+		  confObj.TableName = tablenameField.Text.Trim
 		  
 		  if IsNumeric(WHEREfield.Text) then
 		    
-		    confObj.objidx = WHEREfield.Text.Trim.Val
+		    confObj.objidx = WHEREfield.Text.Trim
 		    
 		  else
 		    
+		    confObj.language = languageField.Text.Trim
 		    confObj.application = applicationField.Text.Trim
 		    confObj.user = userField.Text.Trim
 		    confObj.section = sectionField.Text.Trim
@@ -1370,7 +1431,7 @@ End
 		  confObj.value = valueField.Text.Trim
 		  confObj.comment = commentField.Text.Trim
 		  
-		  confObj = myLocalconf.Upsert(confObj)
+		  confObj = dbsession.pgdbconf_Upsert(confObj)
 		  
 		  if confObj.Error then
 		    MsgBox confObj.ErrorMessage
@@ -1392,10 +1453,10 @@ End
 		  dim field as String = WHEREfield.Text.NthField("," , 1)
 		  dim where as String = WHEREfield.Text.NthField("," , 2)
 		  
-		  dim fields(-1) as String = myLocalconf.QueryDistinct(field , where)
+		  dim fields(-1) as String = dbsession.pgdbconf_QueryDistinct(field , tablenameField.Text.Trim , where)
 		  
-		  if myLocalconf.LastError <> "" then 
-		    MsgBox "Error: " + EndOfLine + myLocalconf.LastError
+		  if pgdbconf_LastError <> "" then 
+		    MsgBox "Error: " + EndOfLine + pgdbconf_LastError
 		    
 		  else
 		    
@@ -1410,8 +1471,11 @@ End
 #tag Events appendBtn
 	#tag Event
 		Sub Action()
-		  dim confObj as new localconfRecord(true)
+		  dim confObj as new pgdbconfRecord(true)
 		  
+		  confObj.TableName = tablenameField.Text.Trim
+		  
+		  confObj.language = languageField.Text.Trim
 		  confObj.application = applicationField.Text.Trim
 		  confObj.user = userField.Text.Trim
 		  confObj.section = sectionField.Text.Trim
@@ -1419,12 +1483,12 @@ End
 		  confObj.value = valueField.Text.Trim
 		  confObj.comment = commentField.Text.Trim
 		  
-		  confObj = myLocalconf.Append2Array(confObj)
+		  confObj = dbsession.pgdbconf_Append2Array(confObj)
 		  
 		  if confObj.Error then
 		    MsgBox confObj.ErrorMessage
 		  else
-		    MainLabel.text = "Just added objidx = " + str(confObj.objidx)
+		    MainLabel.text = "Just added objidx = " + confObj.objidx
 		  end if
 		  
 		  query
@@ -1435,42 +1499,13 @@ End
 #tag Events DeleteBtn
 	#tag Event
 		Sub Action()
-		  dim confObj as new localconfRecord(true)
+		  dim confObj as new pgdbconfRecord(true)
 		  
-		  if IsNumeric(WHEREfield.Text) then
+		  confObj.TableName = tablenameField.Text.Trim
+		  
+		  if WHEREfield.Text.trim <> "" then
 		    
-		    confObj.objidx = WHEREfield.Text.Trim.Val
-		    
-		  else
-		    
-		    confObj.application = applicationField.Text.Trim
-		    confObj.user = userField.Text.Trim
-		    confObj.section = sectionField.Text.Trim
-		    confObj.key = keyField.Text.Trim
-		    
-		  end if
-		  
-		  confObj = myLocalconf.Delete(confObj)
-		  
-		  if confObj.Error then
-		    MsgBox confObj.ErrorMessage
-		  else
-		    MainLabel.text = "Deleted record"
-		  end if
-		  
-		  query
-		  
-		End Sub
-	#tag EndEvent
-#tag EndEvents
-#tag Events ReadSingleBtn
-	#tag Event
-		Sub Action()
-		  dim confObj as new localconfRecord(true)
-		  
-		  if IsNumeric(WHEREfield.Text) then
-		    
-		    confObj.objidx = WHEREfield.Text.Trim.Val
+		    confObj.objidx = WHEREfield.Text.Trim
 		    
 		  else
 		    
@@ -1482,7 +1517,41 @@ End
 		    
 		  end if
 		  
-		  confObj = myLocalconf.ReadSingle(confObj)
+		  confObj = dbsession.pgdbconf_Delete(confObj)
+		  
+		  if confObj.Error then
+		    MsgBox confObj.ErrorMessage
+		  else
+		    MainLabel.text = "Deleted record"
+		  end if
+		  
+		  dumpList.DeleteAllRows
+		  
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+#tag Events ReadSingleBtn
+	#tag Event
+		Sub Action()
+		  dim confObj as new pgdbconfRecord(true)
+		  
+		  confObj.TableName = tablenameField.Text.Trim
+		  
+		  if WHEREfield.Text <> ""  then
+		    
+		    confObj.objidx = WHEREfield.Text
+		    
+		  else
+		    
+		    confObj.language = languageField.Text.Trim
+		    confObj.application = applicationField.Text.Trim
+		    confObj.user = userField.Text.Trim
+		    confObj.section = sectionField.Text.Trim
+		    confObj.key = keyField.Text.Trim
+		    
+		  end if
+		  
+		  confObj = dbsession.pgdbconf_ReadSingle(confObj)
 		  
 		  if confObj.Error then
 		    MsgBox confObj.ErrorMessage
@@ -1497,14 +1566,17 @@ End
 #tag Events ReadArrayBtn
 	#tag Event
 		Sub Action()
-		  dim confObj as new localconfRecord(true)
+		  dim confObj as new pgdbconfRecord(true)
 		  
+		  confObj.TableName = tablenameField.Text.Trim
+		  
+		  confObj.language = languageField.Text.Trim
 		  confObj.application = applicationField.Text.Trim
 		  confObj.user = userField.Text.Trim
 		  confObj.section = sectionField.Text.Trim
 		  confObj.key = keyField.Text.Trim
 		  
-		  dim confArray(-1) as localconfRecord = myLocalconf.ReadArray(confObj)
+		  dim confArray(-1) as pgdbconfRecord = dbsession.pgdbconf_ReadArray(confObj)
 		  
 		  if confArray(0).Error then
 		    MainLabel.Text = "Error getting array"
@@ -1531,7 +1603,7 @@ End
 #tag Events projectLink
 	#tag Event
 		Function MouseDown(X As Integer, Y As Integer) As Boolean
-		  ShowURL(localconfSession.projectURL)
+		  ShowURL(pgdbconf_projectURL)
 		  
 		End Function
 	#tag EndEvent
@@ -1540,6 +1612,19 @@ End
 	#tag Event
 		Sub Open()
 		  
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+#tag Events clearBtn
+	#tag Event
+		Sub Action()
+		  languageField.Text = ""
+		  applicationField.Text = ""
+		  userField.Text = ""
+		  sectionField.Text = ""
+		  keyField.Text = ""
+		  valueField.Text = ""
+		  commentField.Text = ""
 		End Sub
 	#tag EndEvent
 #tag EndEvents
