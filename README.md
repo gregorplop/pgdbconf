@@ -1,4 +1,4 @@
-# pgdbconf - NOT YET FUNCTIONAL
+# pgdbconf
 This is a PostgreSQL-based key-value storage mechanism for storing in-db configuration settings.\
 It is based on the local, SQLite-based localconf\ 
 \
