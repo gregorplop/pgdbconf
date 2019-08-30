@@ -1,7 +1,7 @@
 #tag Class
 Protected Class pgdbconfRecord
 	#tag Method, Flags = &h0
-		Sub Constructor(initExists as Boolean)
+		Sub Constructor(optional initExists as Boolean = true)
 		  Error = False
 		  ErrorMessage = ""
 		  Exists = initExists
@@ -139,7 +139,8 @@ Protected Class pgdbconfRecord
 		#tag ViewProperty
 			Name="objidx"
 			Group="Behavior"
-			Type="Integer"
+			Type="string"
+			EditorType="MultiLineEditor"
 		#tag EndViewProperty
 		#tag ViewProperty
 			Name="section"
@@ -163,6 +164,13 @@ Protected Class pgdbconfRecord
 			Name="language"
 			Group="Behavior"
 			Type="String"
+			EditorType="MultiLineEditor"
+		#tag EndViewProperty
+		#tag ViewProperty
+			Name="TableName"
+			Group="Behavior"
+			Type="String"
+			EditorType="MultiLineEditor"
 		#tag EndViewProperty
 	#tag EndViewBehavior
 End Class
